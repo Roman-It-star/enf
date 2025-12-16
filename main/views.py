@@ -1,5 +1,5 @@
 from django.shortcuts import get_object_or_404
-from django.views.generic import TemplateView, DeleteView
+from django.views.generic import TemplateView, DetailView
 from django.http import HttpResponse
 from django.template.response import TemplateResponse
 from .models import Category, Product, Size
@@ -22,16 +22,16 @@ class IndexView(TemplateView):
         if request.headers.get('HX-Request'):
             return TemplateResponse(request, 'main/home_content.html', context)
         return TemplateResponse(request, self.template_name, context)
-
+    
 
 class CatalogView(TemplateView):
     template = 'main/base.html'
 
     FILTER_MAPPING = {
-        'color' : lambda queryset, value: queryset.filter(color__iexact=value), 
-        'min_price' : lambda queryset, value: queryset.filter(price_gte=value), 
-        'max_price' : lambda queryset, value: queryset.filter(price_lte=value), 
-        'size' : lambda queryset, value: queryset.filter(product_size__size__name=value) 
+        'color': lambda queryset, value: queryset.filter(color__iexact=value),
+        'min_price': lambda queryset, value: queryset.filter(price_gte=value),
+        'max_price': lambda queryset, value: queryset.filter(price_lte=value),
+        'size': lambda queryset, value: queryset.filter(product_sizes__size__name=value),
     }
 
 
@@ -52,31 +52,31 @@ class CatalogView(TemplateView):
                 Q(name__icontains=query) | Q(description__icontains=query)
             )
 
-            filter_params = {}
-            for param, filter_func in self.FILTER_MAPPING.items():
-                value = self.request.GET.get(param)
-                if value:
-                    products = filter_func(products, value)
-                    filter_params[param] = value
-                else:
-                    filter_params[param] = ''
-            
-            filter_params['q'] = query or ''
+        filter_params = {}
+        for param, filter_func in self.FILTER_MAPPING.items():
+            value = self.request.GET.get(param)
+            if value:
+                products = filter_func(products, value)
+                filter_params[param] = value
+            else:
+                filter_params[param] = ''
 
-            context.update({
-                'categories' : categories,
-                'products' : products,
-                'current_category' : category_slug,
-                'filter_params' : filter_params,
-                'sizes' : Size.objects.all(),
-                'search_query' : query or ''
-            })
+        filter_params['q'] = query or ''
 
-            if self.request.GET.get('show_search') == 'true':
-                context['show_search'] = True
-            elif self.request.GET.get('reset_search') == 'true':
-                context['reset_search'] = True
+        context.update({
+            'categories': categories,
+            'products': products,
+            'current_category': category_slug,
+            'filter_params': filter_params,
+            'sizes': Size.objects.all(),
+            'search_query': query or ''
+        })
 
+        if self.request.GET.get('show_search') == 'true':
+            context['show_search'] = True
+        elif self.request.GET.get('reset_search') == 'true':
+            context['reset_search'] = True
+        
         return context
     
 
@@ -89,12 +89,12 @@ class CatalogView(TemplateView):
                 return TemplateResponse(request, 'main/search_button.html', {})
             template = 'main/filter_modal.html' if request.GET.get('show_filters') == 'true' else 'main/catalog.html'
             return TemplateResponse(request, template, context)
-        return TemplateResponse(request, self.template_name, context)
+        return TemplateResponse(request, self.template, context)
     
 
-class ProductDetailView(DeleteView):
+class ProductDetailView(DetailView):
     model = Product
-    template_name = 'main/base.html'
+    template_name = 'main/product_detail.html'
     slug_field = 'slug'
     slug_url_kwarg = 'slug'
 
@@ -113,7 +113,6 @@ class ProductDetailView(DeleteView):
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
         context = self.get_context_data(**kwargs)
-        if request.header.get('HX-Request'):
+        if request.headers.get('HX-Request'):
             return TemplateResponse(request, 'main/product_detail.html', context)
-        raise TemplateResponse(request, self.template_name, context)
-
+        return TemplateResponse(request, self.template_name, context)
